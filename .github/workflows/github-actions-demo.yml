@@ -35,7 +35,7 @@ jobs:
 
       # (A) scp를 위한 SSH 키/known_hosts 준비
       - name: Set up SSH
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
@@ -44,7 +44,7 @@ jobs:
 
       # (B) 질문에 준 scp 방식으로 파일 전송
       - name: Copy artifacts to EC2 (scp)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         run: |
           scp -i ~/.ssh/id_rsa -r \
             dist \
@@ -56,7 +56,7 @@ jobs:
 
       # (C) ssh로 EC2 접속 후 의존성 설치 + pm2 실행/재시작
       - name: Deploy on EC2 (pm2)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         run: |
           ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_HOST" << 'EOF'
             set -e
