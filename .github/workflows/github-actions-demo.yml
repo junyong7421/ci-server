@@ -66,13 +66,27 @@ jobs:
 
             test -f package-lock.json
 
+            # NestJS 11 런타임은 Node 20+ 필요 (EC2가 18이면 업그레이드)
+            if ! command -v node >/dev/null 2>&1; then
+              echo "node is not installed"; exit 1
+            fi
+            NODE_MAJOR="$(node -p 'process.versions.node.split(\".\")[0]')"
+            if [ "$NODE_MAJOR" -lt 20 ]; then
+              sudo dnf -y install curl ca-certificates
+              curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+              sudo dnf -y install nodejs
+            fi
+
             # 런타임 의존성만 설치(원하면 npm ci로 바꿔도 됨)
             npm ci --omit=dev
+
+            # 빌드 산출물 존재 확인
+            test -f dist/main.js
 
             # pm2가 이미 돌고 있으면 reload, 없으면 start
             pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1 \
               && pm2 reload "$PM2_APP_NAME" \
-              || pm2 start dist/main --name "$PM2_APP_NAME"
+              || pm2 start dist/main.js --name "$PM2_APP_NAME"
 
             pm2 save
           EOF
