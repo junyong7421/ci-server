@@ -72,4 +72,4 @@ jobs:
               || pm2 start dist/main --name "$PM2_APP_NAME"
 
             pm2 save
-EOF
+          EOF
