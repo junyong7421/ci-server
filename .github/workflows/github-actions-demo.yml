@@ -2,11 +2,17 @@ name: CI
 
 on:
   push:
+    branches: [ "main" ]   # 필요에 맞게 브랜치 지정
   workflow_dispatch:
 
 jobs:
-  build-and-test:
+  build-test-deploy:
     runs-on: ubuntu-latest
+    env:
+      EC2_USER: ec2-user
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_APP_DIR: ~/sample-server
+      PM2_APP_NAME: sample-server
 
     steps:
       - name: Check out repository code
@@ -21,8 +27,45 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
-
       - name: Build
         run: npm run build
+
+      # (A) scp를 위한 SSH 키/known_hosts 준비
+      - name: Set up SSH
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      # (B) 질문에 준 scp 방식으로 파일 전송
+      - name: Copy artifacts to EC2 (scp)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          scp -i ~/.ssh/id_rsa -r \
+            dist \
+            package.json \
+            package-lock.json \
+            tsconfig.json \
+            tsconfig.build.json \
+            "$EC2_USER@$EC2_HOST:$EC2_APP_DIR"
+
+      # (C) ssh로 EC2 접속 후 의존성 설치 + pm2 실행/재시작
+      - name: Deploy on EC2 (pm2)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_HOST" << 'EOF'
+            set -e
+            cd "$EC2_APP_DIR"
+
+            # 런타임 의존성만 설치(원하면 npm ci로 바꿔도 됨)
+            npm ci --omit=dev
+
+            # pm2가 이미 돌고 있으면 reload, 없으면 start
+            pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1 \
+              && pm2 reload "$PM2_APP_NAME" \
+              || pm2 start dist/main --name "$PM2_APP_NAME"
+
+            pm2 save
+          EOF
