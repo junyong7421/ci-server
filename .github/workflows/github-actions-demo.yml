@@ -11,7 +11,8 @@ jobs:
     env:
       EC2_USER: ec2-user
       EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_APP_DIR: ~/sample-server
+      # NOTE: '~'는 비대화형 쉘/따옴표에서 확장되지 않아 배포가 꼬일 수 있어 절대경로 권장
+      EC2_APP_DIR: /home/ec2-user/sample-server
       PM2_APP_NAME: sample-server
 
     steps:
@@ -46,7 +47,7 @@ jobs:
       - name: Copy artifacts to EC2 (scp)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         run: |
-          ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_HOST" "mkdir -p '$EC2_APP_DIR'"
+          ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_HOST" "mkdir -p \"$EC2_APP_DIR\""
           scp -i ~/.ssh/id_rsa -r \
             dist \
             package.json \
@@ -62,6 +63,8 @@ jobs:
           ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_HOST" bash -se <<EOF
             set -e
             cd "$EC2_APP_DIR"
+
+            test -f package-lock.json
 
             # 런타임 의존성만 설치(원하면 npm ci로 바꿔도 됨)
             npm ci --omit=dev
