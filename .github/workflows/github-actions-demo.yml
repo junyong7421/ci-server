@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]   # 필요에 맞게 브랜치 지정
+    branches: [ "main", "master" ]   # 필요에 맞게 브랜치 지정
   workflow_dispatch:
 
 jobs:
@@ -26,6 +26,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run tests
+        run: npm test -- --no-cache
 
       - name: Build
         run: npm run build
